@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>우연의 고리</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --teal-primary: #0b7a75;
+      --teal-light: #119992;
+      --teal-faint: rgba(11, 122, 117, 0.14);
+      --text-dark: #1d2220;
+      --text-muted: #64748b;
+      --card-shadow: 0 12px 36px rgba(11, 122, 117, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background-color: var(--bg-color);
+      color: var(--text-dark);
+      font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* 상단 타이틀 */
+    header {
+      width: 100%;
+      padding: 40px 20px 8px;
+      text-align: center;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: clamp(1.75rem, 3vw, 2.3rem);
+      font-weight: 400;
+      letter-spacing: 0.14em;
+      color: var(--text-dark);
+      user-select: none;
+    }
+
+    /* 메인 스테이지 */
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 24px 48px;
+      position: relative;
+    }
+
+    .stage-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0px;
+      width: 100%;
+      transition: gap 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .stage-wrapper.has-active-post {
+      gap: 36px;
+    }
+
+    /* 동심원 궤도 SVG 컨테이너 */
+    .orbit-container {
+      position: relative;
+      width: min(86vw, 620px);
+      height: min(86vw, 620px);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #orbitSvg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+
+    .ring-circle {
+      fill: none;
+      stroke: var(--teal-primary);
+      stroke-width: 1.15;
+      opacity: 0.85;
+      transition: stroke-width 0.3s ease, opacity 0.3s ease;
+    }
+
+    .ring-circle.highlighted {
+      stroke-width: 2;
+      opacity: 1;
+    }
+
+    /* 행성(별 마커) 스타일 */
+    .planet-node {
+      cursor: pointer;
+    }
+
+    .planet-bg {
+      fill: var(--teal-primary);
+      stroke: #ffffff;
+      stroke-width: 1.5;
+      transition: fill 0.25s ease;
+    }
+
+    .planet-star {
+      fill: #ffffff;
+      pointer-events: none;
+    }
+
+    .planet-pulse {
+      fill: none;
+      stroke: var(--teal-primary);
+      stroke-width: 1.6;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .planet-node:hover .planet-bg {
+      fill: var(--teal-light);
+    }
+
+    .planet-node.active .planet-bg {
+      fill: #07534f;
+    }
+
+    .planet-node.visited .planet-bg {
+      fill: #0e6662;
+    }
+
+    .planet-node.active .planet-pulse {
+      opacity: 0.6;
+      animation: pulseRing 2.2s infinite ease-out;
+    }
+
+    @keyframes pulseRing {
+      0% {
+        transform: scale(1);
+        opacity: 0.65;
+      }
+      100% {
+        transform: scale(1.9);
+        opacity: 0;
+      }
+    }
+
+    /* 행성 호버 툴팁 */
+    .planet-tooltip {
+      position: fixed;
+      background: rgba(11, 122, 117, 0.94);
+      color: #ffffff;
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      pointer-events: none;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translate(-50%, -100%);
+      transition: opacity 0.18s ease;
+      z-index: 50;
+      box-shadow: 0 4px 14px rgba(11, 122, 117, 0.22);
+    }
+
+    .planet-tooltip.visible {
+      opacity: 1;
+    }
+
+    /* 오른쪽 말풍선 글 카드 */
+    .reader-card {
+      position: relative;
+      width: 0;
+      opacity: 0;
+      pointer-events: none;
+      overflow: visible;
+      transform: translateX(18px);
+      transition:
+        width 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.4s ease,
+        transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .reader-card.open {
+      width: min(88vw, 370px);
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .reader-inner {
+      position: relative;
+      width: 100%;
+      min-height: 460px;
+      max-height: 540px;
+      background: #ffffff;
+      border: 1.5px solid var(--teal-primary);
+      border-radius: 16px;
+      padding: 36px 28px 30px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 왼쪽 말풍선 삼각형 꼬리 */
+    .bubble-pointer {
+      position: absolute;
+      left: -13px;
+      top: 50%;
+      width: 14px;
+      height: 24px;
+      transform: translateY(-50%);
+      z-index: 5;
+      pointer-events: none;
+      transition: top 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* 우상단 원형 X 닫기 버튼 */
+    .close-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background-color: var(--teal-primary);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.2s ease;
+      z-index: 10;
+    }
+
+    .close-btn:hover {
+      background-color: #07534f;
+      transform: scale(1.08);
+    }
+
+    .close-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke: #ffffff;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+    }
+
+    .post-title {
+      font-size: 1.32rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      line-height: 1.4;
+      padding-right: 32px;
+      margin-bottom: 6px;
+    }
+
+    .post-meta {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+    }
+
+    .post-divider {
+      width: 100%;
+      height: 1px;
+      background-color: var(--teal-faint);
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+
+    .post-body {
+      font-family: 'Gowun Batang', 'Noto Sans KR', serif;
+      font-size: 1.01rem;
+      line-height: 1.95;
+      color: #2b3230;
+      overflow-y: auto;
+      padding-right: 6px;
+      white-space: pre-line;
+      word-break: keep-all;
+    }
+
+    .post-body::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .post-body::-webkit-scrollbar-thumb {
+      background: rgba(11, 122, 117, 0.28);
+      border-radius: 4px;
+    }
+
+    /* 동심원 고리 바로 아래 중앙 NEXT 힌트 버튼 */
+    .bottom-journey-nav {
+      margin-top: 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      z-index: 20;
+    }
+
+    .read-progress {
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .read-progress span {
+      color: var(--teal-primary);
+      font-weight: 600;
+    }
+
+    .next-hint-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 30px;
+      border-radius: 999px;
+      border: 1.5px solid var(--teal-primary);
+      background-color: #ffffff;
+      color: var(--teal-primary);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      box-shadow: 0 4px 16px rgba(11, 122, 117, 0.06);
+    }
+
+    .next-hint-btn:hover {
+      background-color: var(--teal-primary);
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(11, 122, 117, 0.18);
+    }
+
+    .next-hint-btn .arrow {
+      transition: transform 0.28s ease;
+      font-weight: 400;
+    }
+
+    .next-hint-btn:hover .arrow {
+      transform: translateX(4px);
+    }
+
+    .next-caption {
+      font-size: 0.77rem;
+      color: var(--text-muted);
+      opacity: 0.82;
+      letter-spacing: 0.02em;
+      transition: color 0.25s ease, opacity 0.25s ease;
+    }
+
+    .bottom-journey-nav:hover .next-caption {
+      color: var(--teal-primary);
+      opacity: 1;
+    }
+
+    /* 하단 좌측 은은한 안내 문구 */
+    .subtle-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 24px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    /* 반응형 (태블릿 및 모바일) */
+    @media (max-width: 960px) {
+      .stage-wrapper,
+      .stage-wrapper.has-active-post {
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .orbit-container {
+        width: min(90vw, 460px);
+        height: min(90vw, 460px);
+      }
+
+      .reader-card.open {
+        width: min(92vw, 460px);
+      }
+
+      .reader-inner {
+        min-height: 280px;
+        max-height: 55vh;
+      }
+
+      .bubble-pointer {
+        left: 50% !important;
+        top: -19px !important;
+        transform: translateX(-50%) rotate(90deg);
+      }
+
+      .subtle-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 상단 타이틀 -->
+  <header>
+    <h1>우연의 고리</h1>
+  </header>
+
+  <!-- 메인 스테이지 -->
+  <main id="mainStage">
+    <div class="stage-wrapper" id="stageWrapper">
+      <!-- 동심원 & 행성 궤도 영역 -->
+      <div class="orbit-container" id="orbitContainer">
+        <svg id="orbitSvg" width="640" height="640" viewBox="0 0 640 640" aria-label="우연의 고리 궤도">
+          <g id="ringsLayer"></g>
+          <g id="planetsLayer"></g>
+        </svg>
+      </div>
+
+      <!-- 행성 클릭 시 열리는 말풍선 글 카드 -->
+      <aside class="reader-card" id="readerCard" aria-live="polite">
+        <svg class="bubble-pointer" id="bubblePointer" width="14" height="24" viewBox="0 0 14 24">
+          <polygon points="14,0 1,12 14,24" fill="#ffffff" />
+          <polyline points="14,1 1.5,12 14,23" fill="none" stroke="#0b7a75" stroke-width="1.5" stroke-linejoin="round" />
+        </svg>
+
+        <button class="close-btn" id="closeCardBtn" title="글 닫기" aria-label="글 닫기">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <line x1="3" y1="3" x2="13" y2="13" />
+            <line x1="13" y1="3" x2="3" y2="13" />
+          </svg>
+        </button>
+
+        <div class="reader-inner">
+          <h2 class="post-title" id="postTitle">글 제목</h2>
+          <div class="post-meta" id="postMeta">작성일</div>
+          <div class="post-divider"></div>
+          <div class="post-body" id="postBody">글 내용이 이곳에 나타납니다.</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 동심원 고리 바로 아래 중앙 NEXT 힌트 버튼 -->
+    <nav class="bottom-journey-nav" aria-label="다음 장소로 이동">
+      <div class="read-progress">읽은 고리 <span id="readCount">0</span> / 12</div>
+      <a
+        class="next-hint-btn"
+        href="https://www.google.co.kr/maps/@/data=!4m6!1m2!10m1!1e1!11m2!2skTMEG5Atp7RetqwHgeTppg!3e3?authuser=2&entry=ttu&g_ep=EgoyMDI2MTExOC4xIKXMDSoASAFQAw%3D%3D"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span>NEXT</span>
+        <span class="arrow">→</span>
+      </a>
+      <p class="next-caption" id="nextCaption">고리의 끝에서 마주하는 다음 장소</p>
+    </nav>
+  </main>
+
+  <!-- 행성 호버 툴팁 -->
+  <div class="planet-tooltip" id="planetTooltip"></div>
+
+  <!-- 좌측 하단 은은한 가이드 -->
+  <div class="subtle-hint">궤도 위 별을 눌러 우연히 쓰인 글을 열어보세요</div>
+
+  <script>
+    // 안쪽부터 바깥쪽 1~12번 궤도에 차례로 배치되는 12개의 글 목록 (localStorage 미사용, 항상 최신 12편 표시)
+    const writings = [
+      {
+        id: 'w-1',
+        number: 1,
+        title: '꿈',
+        meta: '2020년 05월 11일',
+        body: `어떤 아이가 있었다. 
+무언가 하고 있는 듯 해 보였다. 
+그때 천장 구멍에서 빠져나온 먼지같은 정체모를 무언가가 귀속으로 들어갔다. 
+휘청휘청한다. 
+괜찮아 질때 쯤 귀를 막고 피하기 시작했는데 다른 쪽 귀로 두 번째 먼지가 들어갔다. 
+고통스러워했다. 
+양쪽귀를 막고 도망가는데 마지막 세 번째 먼지가 나와 입속으로 들어갔다. 
+그리고 그 아인 죽었다.`
+      },
+      {
+        id: 'w-2',
+        number: 2,
+        title: '먹구름을 쫓는 아이',
+        meta: '2023년 1월 16일',
+        body: `나는 그 먹구름이 파란 하늘인 줄 알았다. 
+
+어느 우중충한 하루였다. 
+하얀 구름이 온 하늘을 덮었고 해는 보이지 않는 하늘에
+저멀리 푸르면서도 탁한 빛을 내는 무언가가 보였다. 
+나는 그 곳에서만 빛이 들어온다고 생각했다. 
+하지만 그것은 먹구름이었고 빛이 내리는 것이 아니었다. 
+
+빛을 쫒아가던 아이는 먹구름 밑에서 무슨 생각을 하게 될까?`
+      },
+      {
+        id: 'w-3',
+        number: 3,
+        title: '물',
+        meta: '2023년 01월 27일',
+        body: `물이 되고 싶다 
+물이 되어 
+비로 내려 너의 울음 소리를 가려주고 
+눈으로 내려 너의 눈이 반짝이게 해주고
+하늘로 올라 너에게 매일 무지개를 보여주고 
+바다고 흘러 너에게 위로가 되는 존재가 되고 싶다.
+지금의 나는 너에게 어떠한 도움이 되지 못해
+물이 되고 싶고 
+물이 되고자 한다.`
+      },
+      {
+        id: 'w-4',
+        number: 4,
+        title: '푸른 산길의 초행자',
+        meta: '2023년 04월 30일',
+        body: `4월에서 5월로 넘어가는 지금같은 시기에 연두빛을 내는 여린잎이 무성한 나무가 가득한 산에 
+햇살이 적당하고 바람이 시원하게 부는 날 어떤사람이 산을 오르고 있다.
+산의 맨위 꼭짓점에는 깃발이 주변 산들보다 유독 높고 가파른 산임을 알리고 있다.
+가파른 산의 초입은 경사가 완만한 오솔길이다.
+그 길은 가기에는 수월해 보이지만 높은 산의 정상까지 오르기에는 많은 시간과 끈기가 필요할 것이다.
+산을 오르는 사람은 아직 산의 중턱보다 좀 아래에 위치한 곳에서 천천히 주변을 구경하고 즐기며 산을 오르고 있다. 
+아직은 산을 오르는 것이 힘들어 보이지 않는다. 
+아직 산을 오르는게 힘들지 않은 이유는 정상까지의 길이 얼마나 남았을 지 모르기 때문인걸까?
+앞으로의 길이 어떨지 경험해 보지 못했기 때문일까? 
+오솔길에 살랑이는 나뭇잎 틈새로 떨어진 햇살의 반짝임 속을 걸어가는 즐거움에 빠져 힘든걸 잊은 것일까? 
+이유는 알 수 없지만 산을 오르는 사람의 발걸음이 경쾌해 보인다.`
+      },
+      {
+        id: 'w-5',
+        number: 5,
+        title: '두 번째 여름',
+        meta: '2024년 08월 19일',
+        body: `계속해서 내리는 비에 공기는 습기를 잔뜩 머금고 자꾸만 무거워져 
+무거워진 공기는 나를 흠뻑 적셔서 자꾸만 나를 무겁게 만들어 
+무거워진 공기는 냄새가 고이게 하고 습기와 땀으로 생겨난 여름의 냄새와 
+그걸 가리려 억지로 베이게 한 향수 냄새에 자꾸 어지러움만 몰려와 
+잠깐이라도 습기를 켜켜히 머금은 수건은 자꾸만 쉰내가 올라오고 
+그걸 모른 나는 수건으로 조금이나마 상쾌해진 얼굴을 다시 더럽혀 
+그렇게 자꾸 기분만 나빠져 
+
+비는 겨우 성체가 된 매미를 나무에서 밀어뜨리고 
+비에 축축해져 진해진 색의 바닥을 보고 걷던 나는 
+배를 보이며 일그러진 매미와 곤충의 시체를 보고 얼굴을 찌푸려 
+문을 열고 나가면 느껴지는 숨이 턱 막히는 물속 같은 밖을 걷다 보면 
+끈적이는 땀이 내 온몸을 뒤덮고 
+땀이 많은 내 체질을 탓하며 또다시 짜증이 몰려와 
+그렇게 얻은 끈적임은 샤워를 해도 자기 전에 다시 나타나 나를 괴롭히거든 
+조금이라도 일찍 눈을 붙이려 어두워진 방안에 누우면 계속해서 찾아오는 소나기가 들고 온 번쩍거리는 천둥번개가 나를 괴롭히고 
+불편함과 피로감에 또 뒤척여 
+내가 설정하지 않은 선풍기 예약시간이 끝나 나를 조금이나마 온도를 낮추던 선풍기마저 배신하면 
+머리가 찡할 정도로 짜증이 쏟구쳐 
+여름은 나에게 짜증을 줘 
+근데도 나는 그 여름에 자꾸만 그 물속을 들어가 
+이 여름을 탓하며 집안에 갇혀있기엔 
+보고 싶은 사람이 너무 많고 하고 싶은 것이 너무 많아 
+
+그리고 생각보다 여름의 색은 표현하기 힘들정도로 예쁘다.`
+      },
+      {
+        id: 'w-6',
+        number: 6,
+        title: '우연',
+        meta: '2024년 어느날',
+        body: `나는 우연을 좋아한다.
+우연히 마주친 친구와의 우연한 대화 
+우연히 눈에 띈 가게 
+우연히 발견한 귀여운 것들 
+우연히 내 기분을 좋게하는 무언가 
+우연이 반복되면 운명이라던데 
+나는 운명을 갈망해 우연을 좋아하게 된걸까? 
+내가 노력하지 않아도 나에게 이어져오는 것들이 너무 좋은가보다. 
+그래서 우연을 만나면 자꾸 외치게 된다. 
+우와 대박 너무좋아. 
+내 선택이 이어져 만나게 된 우연은 
+내가 선택한 것을 후회하지 않게 해주고 
+그 우연 덕에 살아가게 된다.`
+      },
+      {
+        id: 'w-7',
+        number: 7,
+        title: '물게임기',
+        meta: '2024년 어느날',
+        body: `기억은 잃는게 아니라 어딘가에 남아 부유한다. 
+그러다 가끔 물게임기 속 한두개의 링이 우연히 내가 누른 버튼에 의한 흐름을 타고 가다 
+걸라고 만들어진 구조물에 꽃히게 된다. 
+그런 순간처럼 우리는 부유하는 기억들을 붙잡곤 한다.`
+      },
+      {
+        id: 'w-8',
+        number: 8,
+        title: '아이들',
+        meta: '2025년 05월 15일',
+        body: `현재를 살아가며 내일을 기다린다. 
+그들은 그 이상의 것에는 관심이 없다. 
+아이들은 어제의 의미, 엊그제의 의미를 알지 못한다. 
+내일의 의미도 알지 못한다. 
+아이들에게는 모든 것이 현재이고 지금이다.`
+      },
+      {
+        id: 'w-9',
+        number: 9,
+        title: '착각',
+        meta: '2025년 06월 03일',
+        body: `사람들은 모두 나와 같은 줄 알았다. 
+그래서 항상 생각했다. 
+어떻게 그럴수 있지? 
+나와 같은 사람이라면 어떻게 그런 생각과 그런 행동들을 할 수 있을까
+에 대한 의문 
+어떻게 그럴 수 있지가 아니라 평생을 그렇게 살아온 사람도 있다는 것을 
+믿고싶지 않았나보다.`
+      },
+      {
+        id: 'w-10',
+        number: 10,
+        title: '또 하나의 여름',
+        meta: '2025년 08월 21일',
+        body: `또 하나의 여름을 새겼다. 
+땀에 온몸이 젖어 끈적거리는 것도 
+뜨거움을 맞서 아스팔트 위를 걷는 것도 
+공들인 머리와 화장이 더위에 무너져버린 것도 
+종국엔 우리가 웃었던 것들만 남는다. 
+
+이젠 영원이 아니어도 괜찮다. 
+그저
+그들의 한 평생에 그들의 한 계절에 그들의 추억에
+그들의 한 인연으로 남을 수 있어서 존재할 수 있어서 다행이다. 
+살아있어서 다행이다. 
+
+올해도 또 하나의 빛나는 여름을 아로새겼다. 
+
+이제 남은 한 계절 한 계절을 새기며 
+견뎌야지
+버텨야지 
+어떤 계절이 새겨질지 지금의 나는 모르니까 
+
+언제 다가올지 모르는 끝에 두려워 
+마음대로 끝을 예정하지 말아야지 
+
+결말이 어떻든 행복은 어딘가에 남아있을 테니까
+괜찮아 
+
+또 하나의 계절을 함께 할테니`
+      },
+      {
+        id: 'w-11',
+        number: 11,
+        title: '원인불명',
+        meta: '2025년 08월 26일',
+        body: `목구녕 아래로 무언가 걸그럭 거린다. 
+물까 이 소리 없이 걸그럭대는 불편함은 
+목구녕에 멈춘 무언가가 시간이 지나 뒷목을 타고 올라 
+머리로 간다. 가려움이 아닌 지끈거림을 느끼고 이내 입안 구석에 어금니로 자리잡는다. 
+결국엔 편두통인가.`
+      },
+      {
+        id: 'w-12',
+        number: 12,
+        title: '그냥 외침',
+        meta: '2026년 07월 31일',
+        body: `아아아아ㅏ 모르겠다 
+나는 뭘 잘하지? 
+나는 무엇을 좋아하지? 
+나는 앞으로 무엇을 하고싶은가? 
+
+솔직히 말해 내일 죽게 될지도 모르는 알 수 없는 미래에 
+나는 무엇을 하고 살아야 할까 
+
+나는 특출나게 좋아하는 것과 잘하는 것이 없다. 
+
+전부 얕게 알고 적당히 좋아한다. 
+그래서 그 선을 넘지 못하고 그 무엇도 선택하지 못한다. 
+
+그래서 뭘하고 싶은건데`
+      }
+    ];
+
+    const SVG_SIZE = 640;
+    const CENTER = SVG_SIZE / 2;
+    const ringsLayer = document.getElementById('ringsLayer');
+    const planetsLayer = document.getElementById('planetsLayer');
+    const stageWrapper = document.getElementById('stageWrapper');
+    const readerCard = document.getElementById('readerCard');
+    const bubblePointer = document.getElementById('bubblePointer');
+    const postTitleEl = document.getElementById('postTitle');
+    const postMetaEl = document.getElementById('postMeta');
+    const postBodyEl = document.getElementById('postBody');
+    const closeCardBtn = document.getElementById('closeCardBtn');
+    const planetTooltip = document.getElementById('planetTooltip');
+    const readCountEl = document.getElementById('readCount');
+    const nextCaptionEl = document.getElementById('nextCaption');
+
+    // 중앙 작은 원(30) + 비정형 간격의 12개 동심원 궤도 반지름 (안쪽 1번 ~ 바깥쪽 12번)
+    const ringRadii = [
+      30,   // 중심의 작은 빈 원
+      84,   // 1번 고리: 꿈
+      104,  // 2번 고리: 먹구름을 쫓는 아이
+      125,  // 3번 고리: 물
+      147,  // 4번 고리: 푸른 산길의 초행자
+      168,  // 5번 고리: 두 번째 여름
+      188,  // 6번 고리: 우연
+      204,  // 7번 고리: 물게임기 (나이테/레코드 홈처럼 촘촘한 구간)
+      216,  // 8번 고리: 아이들
+      235,  // 9번 고리: 착각
+      255,  // 10번 고리: 또 하나의 여름
+      276,  // 11번 고리: 원인불명
+      298   // 12번 고리: 그냥 외침
+    ];
+
+    let orbitEntities = [];
+    let selectedWritingId = null;
+    let hoveredWritingId = null;
+    let lastTimestamp = null;
+    const visitedIds = new Set();
+
+    // 5각 별 모양 꼭짓점 계산
+    function createStarPoints(cx, cy, outerR, innerR) {
+      const pts = [];
+      for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI / 5) * i - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+      }
+      return pts.join(' ');
+    }
+
+    // 동심원 궤도와 12개 행성 마커 렌더링
+    function buildOrbitScene() {
+      ringsLayer.innerHTML = '';
+      planetsLayer.innerHTML = '';
+      orbitEntities = [];
+
+      const usableRadii = ringRadii.slice(1); // 중심 작은 원(30) 제외한 12개 궤도
+
+      // 1) 동심원 고리 생성
+      ringRadii.forEach((radius, idx) => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', CENTER);
+        circle.setAttribute('cy', CENTER);
+        circle.setAttribute('r', radius);
+        circle.setAttribute('class', 'ring-circle');
+        circle.dataset.ringIndex = idx;
+        ringsLayer.appendChild(circle);
+      });
+
+      // 2) 1번~12번 궤도에 별 마커 배치
+      writings.forEach((item, idx) => {
+        const radius = usableRadii[idx];
+        const initialAngle = ((idx * 137.5) % 360) * (Math.PI / 180);
+        const speed = 0.085 + (idx % 5) * 0.015; // 모두 같은 시계 방향 순환
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', 'planet-node');
+        g.dataset.id = item.id;
+
+        const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        pulse.setAttribute('class', 'planet-pulse');
+        pulse.setAttribute('cx', 0);
+        pulse.setAttribute('cy', 0);
+        pulse.setAttribute('r', 11.5);
+
+        const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        bg.setAttribute('class', 'planet-bg');
+        bg.setAttribute('cx', 0);
+        bg.setAttribute('cy', 0);
+        bg.setAttribute('r', 11);
+
+        const star = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        star.setAttribute('class', 'planet-star');
+        star.setAttribute('points', createStarPoints(0, 0, 6.1, 2.6));
+
+        g.appendChild(pulse);
+        g.appendChild(bg);
+        g.appendChild(star);
+        planetsLayer.appendChild(g);
+
+        const entity = {
+          id: item.id,
+          writing: item,
+          radius,
+          angle: initialAngle,
+          speed,
+          el: g,
+          bgEl: bg
+        };
+
+        g.addEventListener('mouseenter', (e) => {
+          hoveredWritingId = item.id;
+          bg.setAttribute('r', 13.5);
+          highlightRingByRadius(radius, true);
+          showTooltip(`${item.number}. ${item.title}`, e);
+        });
+
+        g.addEventListener('mousemove', (e) => {
+          updateTooltipPos(e);
+        });
+
+        g.addEventListener('mouseleave', () => {
+          hoveredWritingId = null;
+          if (selectedWritingId !== item.id) {
+            bg.setAttribute('r', 11);
+          }
+          highlightRingByRadius(radius, false);
+          hideTooltip();
+        });
+
+        g.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectWriting(item.id);
+        });
+
+        orbitEntities.push(entity);
+      });
+
+      updatePlanetPositions();
+    }
+
+    function highlightRingByRadius(radius, active) {
+      const circles = ringsLayer.querySelectorAll('.ring-circle');
+      circles.forEach((c) => {
+        if (Number(c.getAttribute('r')) === radius) {
+          c.classList.toggle('highlighted', active);
+        }
+      });
+    }
+
+    function showTooltip(text, event) {
+      planetTooltip.textContent = text;
+      planetTooltip.classList.add('visible');
+      updateTooltipPos(event);
+    }
+
+    function updateTooltipPos(event) {
+      planetTooltip.style.left = `${event.clientX}px`;
+      planetTooltip.style.top = `${event.clientY - 8}px`;
+    }
+
+    function hideTooltip() {
+      planetTooltip.classList.remove('visible');
+    }
+
+    function updatePlanetPositions() {
+      orbitEntities.forEach((ent) => {
+        const x = CENTER + ent.radius * Math.cos(ent.angle);
+        const y = CENTER + ent.radius * Math.sin(ent.angle);
+        ent.x = x;
+        ent.y = y;
+        ent.el.setAttribute('transform', `translate(${x.toFixed(2)}, ${y.toFixed(2)})`);
+      });
+
+      if (selectedWritingId && window.innerWidth > 960) {
+        alignPointerToSelectedPlanet();
+      }
+    }
+
+    // 말풍선 꼬리 높이를 클릭된 별 마커와 정렬
+    function alignPointerToSelectedPlanet() {
+      const selectedEnt = orbitEntities.find((e) => e.id === selectedWritingId);
+      if (!selectedEnt) return;
+
+      const svgRect = document.getElementById('orbitSvg').getBoundingClientRect();
+      const cardRect = readerCard.getBoundingClientRect();
+      if (!cardRect.height) return;
+
+      const planetScreenY = svgRect.top + (selectedEnt.y / SVG_SIZE) * svgRect.height;
+      let relativeY = planetScreenY - cardRect.top;
+
+      const minY = 36;
+      const maxY = cardRect.height - 36;
+      relativeY = Math.max(minY, Math.min(maxY, relativeY));
+
+      bubblePointer.style.top = `${relativeY}px`;
+    }
+
+    // 시계 방향 연속 공전 루프
+    function animateOrbits(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const dt = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      let timeScale = 1;
+      if (selectedWritingId) {
+        timeScale = 0; // 글 열람 시 정지
+      } else if (hoveredWritingId) {
+        timeScale = 0.2; // 호버 시 감속
+      }
+
+      if (timeScale > 0) {
+        orbitEntities.forEach((ent) => {
+          ent.angle = (ent.angle + ent.speed * dt * timeScale) % (Math.PI * 2);
+        });
+        updatePlanetPositions();
+      }
+
+      requestAnimationFrame(animateOrbits);
+    }
+
+    // 별 마커 클릭 시 말풍선 카드 열기
+    function selectWriting(id) {
+      const target = orbitEntities.find((e) => e.id === id);
+      if (!target) return;
+
+      selectedWritingId = id;
+      visitedIds.add(id);
+
+      readCountEl.textContent = visitedIds.size;
+      if (visitedIds.size === writings.length) {
+        nextCaptionEl.textContent = '열두 개의 고리를 모두 읽었습니다 · 다음 장소로 이동해보세요';
+      }
+
+      orbitEntities.forEach((ent) => {
+        const isSelected = ent.id === id;
+        ent.el.classList.toggle('active', isSelected);
+        ent.el.classList.toggle('visited', visitedIds.has(ent.id));
+        ent.bgEl.setAttribute('r', isSelected ? 13.5 : 11);
+      });
+
+      postTitleEl.textContent = target.writing.title;
+      postMetaEl.textContent = target.writing.meta;
+      postBodyEl.textContent = target.writing.body;
+      postBodyEl.scrollTop = 0;
+
+      stageWrapper.classList.add('has-active-post');
+      readerCard.classList.add('open');
+
+      requestAnimationFrame(() => {
+        alignPointerToSelectedPlanet();
+      });
+    }
+
+    // 말풍선 카드 닫기 및 순환 재개
+    function closeReaderCard() {
+      selectedWritingId = null;
+      orbitEntities.forEach((ent) => {
+        ent.el.classList.remove('active');
+        ent.bgEl.setAttribute('r', 11);
+      });
+      stageWrapper.classList.remove('has-active-post');
+      readerCard.classList.remove('open');
+    }
+
+    closeCardBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeReaderCard();
+    });
+
+    document.getElementById('mainStage').addEventListener('click', (e) => {
+      if (e.target.id === 'mainStage' || e.target.id === 'stageWrapper' || e.target.id === 'orbitSvg') {
+        if (selectedWritingId) closeReaderCard();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && selectedWritingId) {
+        closeReaderCard();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (selectedWritingId && window.innerWidth > 960) {
+        alignPointerToSelectedPlanet();
+      }
+    });
+
+    buildOrbitScene();
+    requestAnimationFrame(animateOrbits);
+  </script>
+</body>
+</html>
